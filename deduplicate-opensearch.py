@@ -1,21 +1,20 @@
 #!/usr/local/bin/python3
 
-# A description and analysis of this code can be found at 
-# https://alexmarquardt.com/2018/07/23/deduplicating-documents-in-elasticsearch/
-
 import hashlib
-from elasticsearch import Elasticsearch, helpers
+from opensearchpy import OpenSearch, helpers
 
-ES_HOST = 'localhost:9200'
-ES_USER = 'elastic'
-ES_PASSWORD = 'elastic'
+OPS_HOST = 'OPENSEARCH_URL'
+OPS_USER = 'OPENSEARCH_USER'
+OPS_PASSWORD = 'OPENSEARCH_PASSWORD'
 
-es = Elasticsearch([ES_HOST], http_auth=(ES_USER, ES_PASSWORD))
+ops = OpenSearch([OPS_HOST], http_auth=(OPS_USER, OPS_PASSWORD))
 dict_of_duplicate_docs = {}
+
+ops_index = 'OPENSEARCH_INDEX'
 
 # The following line defines the fields that will be
 # used to determine if a document is a duplicate
-keys_to_include_in_hash = ["CAC", "FTSE", "SMI"]
+keys_to_include_in_hash = ["message","test","hour"]
 
 
 # Process documents returned by the current search/scroll
@@ -41,7 +40,7 @@ def populate_dict_of_duplicate_docs(hit):
 # Loop over all documents in the index, and populate the
 # dict_of_duplicate_docs data structure.
 def scroll_over_all_docs():
-    for hit in helpers.scan(es, index='stocks'):
+    for hit in helpers.scan(ops, index=ops_index):
         populate_dict_of_duplicate_docs(hit)
 
 
@@ -52,14 +51,17 @@ def loop_over_hashes_and_remove_duplicates():
       if len(array_of_ids) > 1:
         print("********** Duplicate docs hash=%s **********" % hashval)
         # Get the documents that have mapped to the current hasval
-        matching_docs = es.mget(index="stocks", doc_type="doc", body={"ids": array_of_ids})
-        for doc in matching_docs['docs']:
+        matching_docs = ops.mget(index=ops_index, doc_type="doc", body={"ids": array_of_ids})
+        print("+ doc_original=%s\n" % matching_docs['docs'][0])
+        for doc in matching_docs['docs'][1:]:
             # In order to remove the possibility of hash collisions,
             # write code here to check all fields in the docs to
             # see if they are truly identical - if so, then execute a
             # DELETE operation on all except one.
             # In this example, we just print the docs.
-            print("doc=%s\n" % doc)
+            # For delete, uncomment next line
+            #ops.delete(doc['_index'],doc['_id'])
+            print("- doc_deleted=%s\n" % doc)
 
 
 
